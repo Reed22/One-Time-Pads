@@ -68,7 +68,7 @@ void encrypt(int conn_socket, char plain[], char key[]){
         ciphertext[i] = ((plain_num + key_num) % 27) + 65;
 
         if(ciphertext[i] == 26 + 65)
-          ciphertext[i] == SPACE_ASCII;
+          ciphertext[i] = SPACE_ASCII;
     }
 
     charsRead = send(conn_socket, ciphertext, strlen(ciphertext), 0); 
