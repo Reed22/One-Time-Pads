@@ -1,6 +1,7 @@
 #include <stdio.h> 
 #include <stdlib.h>
 #include <time.h> 
+#include <string.h>
 
 #define LOWER_LIM 65    //65 is ascii for 'A'
 #define UPPER_LIM 91    //90 is ascii for 'Z'; if 91, use space
@@ -24,6 +25,7 @@ int main( int argc, char *argv[] )  {
     int key_len = atoi(argv[1]); //Key length
     int rand_num; 
     char key[key_len + 2]; // key_len + newline + '\0'
+    memset(key, '\0', sizeof(key)); 
 
     //Last character of key needs to be newline
     key[key_len] = '\n'; 
