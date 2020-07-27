@@ -8,7 +8,7 @@
 #include <stdbool.h> 
 
 #define NUM_MESSAGES 2
-#define PLAIN_MSG 0
+#define CIPHER_MSG 0
 #define KEY_MSG 1
 #define SPACE_ASCII 32
 
@@ -39,44 +39,44 @@ void setupAddressStruct(struct sockaddr_in* address,
   address->sin_addr.s_addr = INADDR_ANY;
 }
 /**************************************************************
-*                 void encrypt(plain, key)
+*                 void encrypt(cipher, key)
 ***************************************************************/
-void encrypt(int conn_socket, char plain[], char key[]){
-    int plain_len = strlen(plain);
-    int plain_num, key_num;
+void decrypt(int conn_socket, char cipher[], char key[]){
+    int cipher_len = strlen(cipher);
+    int cipher_num, key_num;
     int chars_read = 0;
-    char ciphertext[plain_len];
+    char plaintext[cipher_len];
 
-    //Go through each character of plain and key to get ciphertext
-    for(int i = 0; i < plain_len; i++){
+    //Go through each character of cipher and key to get plaintext
+    for(int i = 0; i < cipher_len; i++){
         //Subtract 65 from ASCII to get order (A = 0, Z = 25)
-        plain_num = plain[i] - 65;
+        cipher_num = cipher[i] - 65;
         key_num = key[i] - 65;
 
         //If character is space, make the number 26 (one after Z)
         //Doing this after assigning nums to change num if the actual
         //character is a space
-        if(plain[i] == SPACE_ASCII)
-          plain_num = 26;
+        if(cipher[i] == SPACE_ASCII)
+          cipher_num = 26;
 
         if(key[i] == SPACE_ASCII)
           key_num = 26;
         
-        //Mod 27 to account for space characters....need confirmation that this is okay. 
-        //Add plain_num and key_num, take Modulus of 27, add 65 to get ASCII back
-        ciphertext[i] = ((plain_num + key_num) % 27) + 65;
+        //Mod 27 to account for space characters
+        //Subtract cipher_num and key_num, take Modulus of 27, add 65 to get ASCII back
+        plaintext[i] = ((cipher_num - key_num) % 27) + 65;
 
-        if(ciphertext[i] == 26 + 65)
-          ciphertext[i] = SPACE_ASCII;
+        if(plaintext[i] == 65 - 26)
+          plaintext[i] = SPACE_ASCII;
     }
     if(debug){
-      //printf("\n\n\n\n\n\n%s\nCipher Length: %d\n\n\n\n\n\n", ciphertext, strlen(ciphertext));
-      printf("Server: Cipher Length: %d\n", strlen(ciphertext));
+      //printf("\n\n\n\n\n\n%s\nCipher Length: %d\n\n\n\n\n\n", plaintext, strlen(plaintext));
+      printf("Server: Plain Length: %d\n", strlen(plaintext));
     }
 
-    int expected_chars_sent = strlen(ciphertext);
+    int expected_chars_sent = strlen(plaintext);
     while(chars_read < expected_chars_sent)
-      chars_read += send(conn_socket, ciphertext, strlen(ciphertext), 0); 
+      chars_read += send(conn_socket, plaintext, strlen(plaintext), 0); 
     
     if(debug){
       printf("Server: Expected(%d) ::: Actual(%d)\n", expected_chars_sent, chars_read);
@@ -90,7 +90,7 @@ void encrypt(int conn_socket, char plain[], char key[]){
 ***************************************************************/
 int main(int argc, char *argv[]){
   int connectionSocket, charsRead;
-  char plain_buf[100000]; //This needs to be larger
+  char cipher_buf[100000]; //This needs to be larger
   char key_buf[100000];   //This needs to be larger
   struct sockaddr_in serverAddress, clientAddress;
   socklen_t sizeOfClientInfo = sizeof(clientAddress);
@@ -137,20 +137,20 @@ int main(int argc, char *argv[]){
                           ntohs(clientAddress.sin_port));
 
     // Get the message from the client and display it
-    memset(plain_buf, '\0', 100000);
+    memset(cipher_buf, '\0', 100000);
     memset(key_buf, '\0', 100000);
 
     for(int i = 0; i < NUM_MESSAGES; i++){
         //Read the client's message from the socket
         //First message is plaintext;
-        if(i == PLAIN_MSG){
-          charsRead = recv(connectionSocket, plain_buf, 99999, 0); 
+        if(i == CIPHER_MSG){
+          charsRead = recv(connectionSocket, cipher_buf, 99999, 0); 
           if (charsRead < 0){
             error("ERROR reading from socket");
           }
           if(debug)
-            //printf("SERVER: \n\n\n\n\n%s\nPlain Length: %d\n\n\n\n\n", plain_buf, strlen(plain_buf));
-            printf("SERVER: Plain Length: %d\n", strlen(plain_buf));
+            //printf("SERVER: \n\n\n\n\n%s\ncipher Length: %d\n\n\n\n\n", cipher_buf, strlen(cipher_buf));
+            printf("SERVER: cipher Length: %d\n", strlen(cipher_buf));
         }
 
         //Second message is key
@@ -164,7 +164,7 @@ int main(int argc, char *argv[]){
     }
 
     //Encrypt plaintext and send
-    encrypt(connectionSocket, plain_buf, key_buf);
+    decrypt(connectionSocket, cipher_buf, key_buf);
 
     close(connectionSocket); 
   }

@@ -16,7 +16,7 @@
 #define Z_ASCII 90    //90 is ascii for 'Z'
 #define SPACE_ASCII 32  //Ascii for space character
 
-bool debug = true;
+bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
   } 
   //Check to make sure key is at least as big as plaintext
   //argv[1] = plaintext    argv[2] = key
-  int plaintext_len = fileLength(argv[1]);
+  int ciphertext_len = fileLength(argv[1]);
   int key_len = fileLength(argv[2]);
 
   if(fileLength(argv[1]) > fileLength(argv[2])){
@@ -159,7 +159,7 @@ int main(int argc, char *argv[]) {
 
   //Send plaintext and key
   //Returns -1 if bad character detected
-  success = sendFile(socketFD, argv[1], plaintext_len);
+  success = sendFile(socketFD, argv[1], ciphertext_len);
   if(success == -1){
     exit(1);
   }
@@ -170,10 +170,10 @@ int main(int argc, char *argv[]) {
   }
 
   if(debug)
-    printf("CLIENT: Plaintext_len: %d\n", plaintext_len);
+    printf("CLIENT: ciphertext_len: %d\n", ciphertext_len);
 
   //Declare buff with length + 1 (+1 to account for newline)
-  char buffer[plaintext_len + 1]; 
+  char buffer[ciphertext_len + 1]; 
   memset(buffer, '\0', sizeof(buffer));
 
   //Read ciphertext
@@ -183,10 +183,10 @@ int main(int argc, char *argv[]) {
   }
 
   //Insert newline character to end of buffer
-  buffer[plaintext_len] = '\n';
+  buffer[ciphertext_len] = '\n';
 
   if(debug){
-    printf("CLIENT: SIZE OF BUFFER: %d\n\n\n\n\n", strlen(buffer));
+    printf("CLIENT: SIZE OF BUFFER: %d\n", strlen(buffer));
     //printf("CLIENT: I received this from the server: \"%s\"\n", buffer);
   }
 
