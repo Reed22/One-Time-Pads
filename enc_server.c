@@ -12,7 +12,7 @@
 #define KEY_MSG 1
 #define SPACE_ASCII 32
 
-bool debug = true;
+bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -89,9 +89,12 @@ void encrypt(int conn_socket, char plain[], char key[]){
 *              int main(int argc, char *argv[])
 ***************************************************************/
 int main(int argc, char *argv[]){
-  int connectionSocket, charsRead;
+  int connectionSocket, chars_read, chars_written, expected_chars_sent;
   char plain_buf[100000]; //This needs to be larger
   char key_buf[100000];   //This needs to be larger
+  char enc_client_req[256];
+  char perm_resp[] = "granted";
+  char denied[] = "denied";
   struct sockaddr_in serverAddress, clientAddress;
   socklen_t sizeOfClientInfo = sizeof(clientAddress);
 
@@ -131,32 +134,44 @@ int main(int argc, char *argv[]){
       error("ERROR on accept");
     }
 
-    //USE THIS INFO TO VEFIFY CONNECTION WITH RIGHT CLIENT
-    printf("SERVER: Connected to client running at host %d port %d\n", 
-                          ntohs(clientAddress.sin_addr.s_addr),
-                          ntohs(clientAddress.sin_port));
-
-    // Get the message from the client and display it
     memset(plain_buf, '\0', 100000);
     memset(key_buf, '\0', 100000);
+    memset(enc_client_req, '\0', 256);
+    
+     //Receive Authorization
+    chars_read = recv(connectionSocket, enc_client_req, 255, 0); 
+    if (chars_read < 0){
+        error("ERROR reading from socket");
+    }
 
+    chars_written = 0;
+
+    //Send permission granted message
+    if(strcmp(enc_client_req, "enc_req") == 0){
+          expected_chars_sent = strlen(perm_resp);
+          while(chars_written < expected_chars_sent)
+            chars_written += send(connectionSocket, perm_resp, strlen(perm_resp), 0); 
+    }
+    else {
+          expected_chars_sent = strlen(denied);
+          while(chars_written < expected_chars_sent)
+            chars_written += send(connectionSocket, denied, strlen(denied), 0); 
+    }
+
+    //Read the client's message from the socket
     for(int i = 0; i < NUM_MESSAGES; i++){
-        //Read the client's message from the socket
         //First message is plaintext;
         if(i == PLAIN_MSG){
-          charsRead = recv(connectionSocket, plain_buf, 99999, 0); 
-          if (charsRead < 0){
+          chars_read = recv(connectionSocket, plain_buf, 99999, 0); 
+          if (chars_read < 0){
             error("ERROR reading from socket");
           }
-          if(debug)
-            //printf("SERVER: \n\n\n\n\n%s\nPlain Length: %d\n\n\n\n\n", plain_buf, strlen(plain_buf));
-            printf("SERVER: Plain Length: %d\n", strlen(plain_buf));
         }
 
         //Second message is key
         else if(i == KEY_MSG){
-          charsRead = recv(connectionSocket, key_buf, 99999, 0); 
-          if (charsRead < 0){
+          chars_read = recv(connectionSocket, key_buf, 99999, 0); 
+          if (chars_read < 0){
             error("ERROR reading from socket");
           }
           //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
