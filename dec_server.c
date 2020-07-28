@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdbool.h> 
@@ -138,55 +139,61 @@ int main(int argc, char *argv[]){
     if (connectionSocket < 0){
       error("ERROR on accept");
     }
-
-    memset(cipher_buf, '\0', 100000);
-    memset(key_buf, '\0', 100000);
-    memset(dec_client_req, '\0', 256);
-    
-     //Receive Authorization
-    chars_read = recv(connectionSocket, dec_client_req, 255, 0); 
-    if (chars_read < 0){
-        error("ERROR reading from socket");
-    }
-
-    chars_written = 0;
-
-    //Send permission granted message
-    if(strcmp(dec_client_req, "dec_req") == 0){
-          expected_chars_sent = strlen(perm_resp);
-          while(chars_written < expected_chars_sent)
-            chars_written += send(connectionSocket, perm_resp, strlen(perm_resp), 0); 
-    }
-    else {
-          expected_chars_sent = strlen(denied);
-          while(chars_written < expected_chars_sent)
-            chars_written += send(connectionSocket, denied, strlen(denied), 0); 
-    }
-
-    //Read the client's message from the socket
-    for(int i = 0; i < NUM_MESSAGES; i++){
-        //First message is plaintext;
-        if(i == CIPHER_MSG){
-          chars_read = recv(connectionSocket, cipher_buf, 99999, 0); 
-          if (chars_read < 0){
+    pid_t child_pid = fork();
+    int child_status;
+    if(child_pid == 0){
+        memset(cipher_buf, '\0', 100000);
+        memset(key_buf, '\0', 100000);
+        memset(dec_client_req, '\0', 256);
+        
+        //Receive Authorization
+        chars_read = recv(connectionSocket, dec_client_req, 255, 0); 
+        if (chars_read < 0){
             error("ERROR reading from socket");
-          }
         }
 
-        //Second message is key
-        else if(i == KEY_MSG){
-          chars_read = recv(connectionSocket, key_buf, 99999, 0); 
-          if (chars_read < 0){
-            error("ERROR reading from socket");
-          }
-          //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
+        chars_written = 0;
+
+        //Send permission granted message
+        if(strcmp(dec_client_req, "dec_req") == 0){
+            expected_chars_sent = strlen(perm_resp);
+            while(chars_written < expected_chars_sent)
+                chars_written += send(connectionSocket, perm_resp, strlen(perm_resp), 0); 
         }
+        else {
+            expected_chars_sent = strlen(denied);
+            while(chars_written < expected_chars_sent)
+                chars_written += send(connectionSocket, denied, strlen(denied), 0); 
+        }
+
+        //Read the client's message from the socket
+        for(int i = 0; i < NUM_MESSAGES; i++){
+            //First message is plaintext;
+            if(i == CIPHER_MSG){
+            chars_read = recv(connectionSocket, cipher_buf, 99999, 0); 
+            if (chars_read < 0){
+                error("ERROR reading from socket");
+            }
+            }
+
+            //Second message is key
+            else if(i == KEY_MSG){
+            chars_read = recv(connectionSocket, key_buf, 99999, 0); 
+            if (chars_read < 0){
+                error("ERROR reading from socket");
+            }
+            //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
+            }
+        }
+
+        //Decrypt ciphertext and send
+        decrypt(connectionSocket, cipher_buf, key_buf);
+
+        close(connectionSocket); 
     }
+    else
+      child_pid = waitpid(child_pid, &child_status, WNOHANG);
 
-    //Decrypt ciphertext and send
-    decrypt(connectionSocket, cipher_buf, key_buf);
-
-    close(connectionSocket); 
   }
   // Close the listening socket
   close(listenSocket); 

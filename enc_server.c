@@ -46,7 +46,10 @@ void encrypt(int conn_socket, char plain[], char key[]){
     int plain_num, key_num;
     int chars_read = 0;
     char ciphertext[plain_len];
-    
+
+    //PLAINLEN IS ACTUALLY NOT THE CORRECT VALUE -> NEED TO LOOK AT plain[] BEING PASSED IN
+    printf("SERVER: plain_len : %d\n", plain_len);
+
     //Go through each character of plain and key to get ciphertext
     for(int i = 0; i < plain_len; i++){
         //Subtract 65 from ASCII to get order (A = 0, Z = 25)
@@ -76,6 +79,11 @@ void encrypt(int conn_socket, char plain[], char key[]){
     while(chars_read < expected_chars_sent)
       chars_read += send(conn_socket, ciphertext, strlen(ciphertext), 0); 
 
+    //EXPECTED AND ACTUAL < ACTUAL SIZE OF plaintext4 ----------------------------------
+    printf("SERVER: Expected(%d) :: Actual(%d)\n",expected_chars_sent, chars_read);
+    printf("SERVER: Strlen of ciphertext: %d\n", strlen(ciphertext));
+    printf("SERVER: Strlen of plain: %d\n", strlen(plain));
+    //printf("%s\n\n\n", ciphertext);
     if (chars_read < 0)
       error("ERROR writing to socket");
 }
@@ -124,58 +132,64 @@ int main(int argc, char *argv[]){
     connectionSocket = accept(listenSocket, 
                 (struct sockaddr *)&clientAddress, 
                 &sizeOfClientInfo); 
+    
     if (connectionSocket < 0){
       error("ERROR on accept");
     }
-
-    memset(plain_buf, '\0', 100000);
-    memset(key_buf, '\0', 100000);
-    memset(enc_client_req, '\0', 256);
     
-     //Receive Authorization
-    chars_read = recv(connectionSocket, enc_client_req, 255, 0); 
-    if (chars_read < 0){
-        error("ERROR reading from socket");
-    }
+    pid_t child_pid = fork();
+    if(child_pid == 0){
+      memset(plain_buf, '\0', 100000);
+      memset(key_buf, '\0', 100000);
+      memset(enc_client_req, '\0', 256);
+      
+      //Receive Authorization
+      chars_read = recv(connectionSocket, enc_client_req, 255, 0); 
+      if (chars_read < 0){
+          error("ERROR reading from socket");
+      }
 
-    chars_written = 0;
+      chars_written = 0;
 
-    //Send permission granted message
-    if(strcmp(enc_client_req, "enc_req") == 0){
-          expected_chars_sent = strlen(perm_resp);
-          while(chars_written < expected_chars_sent)
-            chars_written += send(connectionSocket, perm_resp, strlen(perm_resp), 0); 
-    }
-    else {
-          expected_chars_sent = strlen(denied);
-          while(chars_written < expected_chars_sent)
-            chars_written += send(connectionSocket, denied, strlen(denied), 0); 
-    }
+      //Send permission granted message
+      if(strcmp(enc_client_req, "enc_req") == 0){
+            expected_chars_sent = strlen(perm_resp);
+            while(chars_written < expected_chars_sent)
+              chars_written += send(connectionSocket, perm_resp, strlen(perm_resp), 0); 
+      }
+      else {
+            expected_chars_sent = strlen(denied);
+            while(chars_written < expected_chars_sent)
+              chars_written += send(connectionSocket, denied, strlen(denied), 0); 
+      }
 
-    //Read the client's message from the socket
-    for(int i = 0; i < NUM_MESSAGES; i++){
-        //First message is plaintext;
-        if(i == PLAIN_MSG){
-          chars_read = recv(connectionSocket, plain_buf, 99999, 0); 
-          if (chars_read < 0){
-            error("ERROR reading from socket");
+      //Read the client's message from the socket
+      for(int i = 0; i < NUM_MESSAGES; i++){
+          //First message is plaintext;
+          if(i == PLAIN_MSG){
+            chars_read = recv(connectionSocket, plain_buf, 99999, 0); 
+            if (chars_read < 0){
+              error("ERROR reading from socket");
+            }
           }
-        }
 
-        //Second message is key
-        else if(i == KEY_MSG){
-          chars_read = recv(connectionSocket, key_buf, 99999, 0); 
-          if (chars_read < 0){
-            error("ERROR reading from socket");
+          //Second message is key
+          else if(i == KEY_MSG){
+            chars_read = recv(connectionSocket, key_buf, 99999, 0); 
+            if (chars_read < 0){
+              error("ERROR reading from socket");
+            }
           }
-          //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
-        }
+      }
+
+      //Encrypt plaintext and send
+      
+      //STRLEN IS NOT RIGHT HERE
+      printf("SERVER: strlen(plain_buf) : %d\n", strlen(plain_buf));
+      encrypt(connectionSocket, plain_buf, key_buf);
+
+      close(connectionSocket); 
     }
-
-    //Encrypt plaintext and send
-    encrypt(connectionSocket, plain_buf, key_buf);
-
-    close(connectionSocket); 
   }
   // Close the listening socket
   close(listenSocket); 

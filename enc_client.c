@@ -85,7 +85,10 @@ int sendFile(int socket, char* file_name, int length){
     while(chars_written < expected_chars_written)
       chars_written += send(socket, buf, strlen(buf), 0); 
 
-    //NEED TO LOOP TO MAKE SURE ALL STUFF GOT READ
+    //IT SAYS IT IS SENDING THE RIGHT AMOUNT OF DATA
+    printf("CLIENT: Expected(%d) :: Actual(%d)\n",expected_chars_written,chars_written);
+    printf("CLIENT: Strlen of buf: %d\n", strlen(buf));
+
     if (chars_written < 0){
       error("CLIENT: ERROR writing to socket");
     }
@@ -189,16 +192,18 @@ int main(int argc, char *argv[]) {
   memset(buffer, '\0', sizeof(buffer));
 
   //Read ciphertext
+  //BUFFER IS NOT RECEIVING ALL OF THE INFO
   charsRead = recv(socketFD, buffer, sizeof(buffer) - 1, 0);
   if (charsRead < 0){
     error("CLIENT: ERROR reading from socket");
   }
-
+  printf("CLIENT: Plaintext_Len : %d\n", plaintext_len);
+  printf("CLIENT: Final strlen : %d\n\n", strlen(buffer));
   //Insert newline character and null characterto end of buffer
   //buffer[plaintext_len] = '\n';
   //buffer[plaintext_len+1] = '\0';
 
-  printf("%s\n", buffer);
+  //printf("%s\n", buffer);
 
 
   // Close the socket
