@@ -16,7 +16,7 @@
 #define Z_ASCII 90    //90 is ascii for 'Z'
 #define SPACE_ASCII 32  //Ascii for space character
 
-bool debug = true;
+bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -181,16 +181,19 @@ int main(int argc, char *argv[]) {
   if (charsRead < 0){
     error("CLIENT: ERROR reading from socket");
   }
-
-  //Insert newline character to end of buffer
+  //Insert newline character and null characterto end of buffer
   buffer[plaintext_len] = '\n';
+  buffer[plaintext_len+1] = '\0';
+  //for(int i = 0; i < plaintext_len + 2; i++){
+  //  printf("buffer[%d] = %c\n", i, buffer[i]);
+  //}
+  printf("%s", buffer);
 
   if(debug){
     printf("CLIENT: SIZE OF BUFFER: %d\n\n\n\n\n", strlen(buffer));
     //printf("CLIENT: I received this from the server: \"%s\"\n", buffer);
   }
 
-  printf("%s", buffer);
 
   // Close the socket
   close(socketFD); 

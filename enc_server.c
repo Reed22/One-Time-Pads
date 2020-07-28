@@ -12,7 +12,7 @@
 #define KEY_MSG 1
 #define SPACE_ASCII 32
 
-bool debug = false;
+bool debug = true;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -71,7 +71,7 @@ void encrypt(int conn_socket, char plain[], char key[]){
     }
     if(debug){
       //printf("\n\n\n\n\n\n%s\nCipher Length: %d\n\n\n\n\n\n", ciphertext, strlen(ciphertext));
-      printf("Server: Cipher Length: %d\n", strlen(ciphertext));
+      printf("Server Cipher\n%s Length: %d\n", ciphertext, strlen(ciphertext));
     }
 
     int expected_chars_sent = strlen(ciphertext);
