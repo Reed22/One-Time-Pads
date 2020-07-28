@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
   }
   if(strcmp(enc_res, "granted") != 0){
     fprintf(stderr,"Error: Permission Denied\n");
-    exit(1);
+    exit(2);
   }
 
   //Send plaintext and key

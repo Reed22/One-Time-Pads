@@ -16,7 +16,6 @@
 #define Z_ASCII 90    //90 is ascii for 'Z'
 #define SPACE_ASCII 32  //Ascii for space character
 
-bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -80,17 +79,12 @@ int sendFile(int socket, char* file_name, int length){
     }
     //Strip the newline character
     buf[length] = '\0';
-    
-    if(false){
-      printf("buf: %s\n", buf);
-    }
 
     fclose(file);
     int expected_chars_written = strlen(buf);
     while(chars_written < expected_chars_written)
       chars_written += send(socket, buf, strlen(buf), 0); 
 
-    //NEED TO LOOP TO MAKE SURE ALL STUFF GOT READ
     if (chars_written < 0){
       error("CLIENT: ERROR writing to socket");
     }
@@ -157,6 +151,26 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR connecting");
   }
 
+  //Send Authorization
+  char dec_req[] = "dec_req";
+  char dec_res[256];
+  int expected_chars_written = strlen(dec_req);
+  int chars_written = 0;
+
+  //Send Authorization
+  while(chars_written < expected_chars_written)
+      chars_written += send(socketFD, dec_req, strlen(dec_req), 0);
+
+  //Receive Authorization response
+  charsRead = recv(socketFD, dec_res, sizeof(dec_res) - 1, 0);
+  if (charsRead < 0){
+    error("CLIENT: ERROR reading from socket");
+  }
+  if(strcmp(dec_res, "granted") != 0){
+    fprintf(stderr,"Error: Permission Denied\n");
+    exit(2);
+  }
+
   //Send plaintext and key
   //Returns -1 if bad character detected
   success = sendFile(socketFD, argv[1], ciphertext_len);
@@ -169,9 +183,6 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  if(debug)
-    printf("CLIENT: ciphertext_len: %d\n", ciphertext_len);
-
   //Declare buff with length + 1 (+1 to account for newline)
   char buffer[ciphertext_len + 1]; 
   memset(buffer, '\0', sizeof(buffer));
@@ -182,15 +193,12 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR reading from socket");
   }
 
-  //Insert newline character to end of buffer
-  buffer[ciphertext_len] = '\n';
+  //Insert newline character and null characterto end of buffer
+  //buffer[plaintext_len] = '\n';
+  //buffer[plaintext_len+1] = '\0';
 
-  if(debug){
-    printf("CLIENT: SIZE OF BUFFER: %d\n", strlen(buffer));
-    //printf("CLIENT: I received this from the server: \"%s\"\n", buffer);
-  }
+  printf("%s\n", buffer);
 
-  printf("%s", buffer);
 
   // Close the socket
   close(socketFD); 

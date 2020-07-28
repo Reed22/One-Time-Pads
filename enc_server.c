@@ -46,8 +46,7 @@ void encrypt(int conn_socket, char plain[], char key[]){
     int plain_num, key_num;
     int chars_read = 0;
     char ciphertext[plain_len];
-    printf("%s\n", plain);
-    printf("%s\n", key);
+    
     //Go through each character of plain and key to get ciphertext
     for(int i = 0; i < plain_len; i++){
         //Subtract 65 from ASCII to get order (A = 0, Z = 25)
