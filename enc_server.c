@@ -46,13 +46,13 @@ void encrypt(int conn_socket, char plain[], char key[]){
     int plain_num, key_num;
     int chars_read = 0;
     char ciphertext[plain_len];
-
+    printf("%s\n", plain);
+    printf("%s\n", key);
     //Go through each character of plain and key to get ciphertext
     for(int i = 0; i < plain_len; i++){
         //Subtract 65 from ASCII to get order (A = 0, Z = 25)
         plain_num = plain[i] - 65;
         key_num = key[i] - 65;
-
         //If character is space, make the number 26 (one after Z)
         //Doing this after assigning nums to change num if the actual
         //character is a space
@@ -68,19 +68,14 @@ void encrypt(int conn_socket, char plain[], char key[]){
 
         if(ciphertext[i] == 26 + 65)
           ciphertext[i] = SPACE_ASCII;
-    }
-    if(debug){
-      //printf("\n\n\n\n\n\n%s\nCipher Length: %d\n\n\n\n\n\n", ciphertext, strlen(ciphertext));
-      printf("Server Cipher\n%s Length: %d\n", ciphertext, strlen(ciphertext));
+        
+        //printf("( %c(%d) + %c(%d) ) MOD 27 = %d  +  65 = %c \n", plain[i], plain_num, key[i], key_num, ((plain_num + key_num) % 27), ciphertext[i]);
+
     }
 
     int expected_chars_sent = strlen(ciphertext);
     while(chars_read < expected_chars_sent)
       chars_read += send(conn_socket, ciphertext, strlen(ciphertext), 0); 
-    
-    if(debug){
-      printf("Server: Expected(%d) ::: Actual(%d)\n", expected_chars_sent, chars_read);
-    }
 
     if (chars_read < 0)
       error("ERROR writing to socket");

@@ -38,6 +38,7 @@ void setupAddressStruct(struct sockaddr_in* address,
   // Allow a client at any address to connect to this server
   address->sin_addr.s_addr = INADDR_ANY;
 }
+
 /**************************************************************
 *                 void encrypt(cipher, key)
 ***************************************************************/
@@ -46,6 +47,7 @@ void decrypt(int conn_socket, char cipher[], char key[]){
     int cipher_num, key_num;
     int chars_read = 0;
     char plaintext[cipher_len];
+    int diff;
 
     //Go through each character of cipher and key to get plaintext
     for(int i = 0; i < cipher_len; i++){
@@ -64,14 +66,18 @@ void decrypt(int conn_socket, char cipher[], char key[]){
         
         //Mod 27 to account for space characters
         //Subtract cipher_num and key_num, take Modulus of 27, add 65 to get ASCII back
-        plaintext[i] = ((cipher_num - key_num) % 27) + 65;
+        diff = cipher_num - key_num;
+        if(diff < 0){
+          diff += 27;
+        }
 
-        if(plaintext[i] == 65 - 26)
+        plaintext[i] = (diff % 27) + 65;
+
+        if(plaintext[i] == 65 + 26)
           plaintext[i] = SPACE_ASCII;
-    }
-    if(debug){
-      //printf("\n\n\n\n\n\n%s\nCipher Length: %d\n\n\n\n\n\n", plaintext, strlen(plaintext));
-      printf("Server: Plain Length: %d\n", strlen(plaintext));
+
+        //printf("( %c(%d) - %c(%d) ) MOD 27 = %d  +  65 = %c \n", cipher[i], cipher_num, key[i], key_num, ((diff) % 27), plaintext[i]);
+
     }
 
     int expected_chars_sent = strlen(plaintext);
