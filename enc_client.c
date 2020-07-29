@@ -152,26 +152,7 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR connecting");
   }
 
-  //Send Authorization
-  char enc_req[] = "enc_req";
-  char enc_res[256];
-  int expected_chars_written = strlen(enc_req);
-  int chars_written = 0;
-
-  //Send Authorization
-  while(chars_written < expected_chars_written)
-      chars_written += send(socketFD, enc_req, strlen(enc_req), 0);
-
-  //Receive Authorization response
-  charsRead = recv(socketFD, enc_res, sizeof(enc_res) - 1, 0);
-  if (charsRead < 0){
-    error("CLIENT: ERROR reading from socket");
-  }
-  if(strcmp(enc_res, "granted") != 0){
-    fprintf(stderr,"Error: Permission Denied\n");
-    exit(1);
-  }
-
+  
   //Send plaintext and key
   //Returns -1 if bad character detected
   success = sendFile(socketFD, argv[1], plaintext_len);
@@ -195,10 +176,10 @@ int main(int argc, char *argv[]) {
   }
 
   //Insert newline character and null characterto end of buffer
-  //buffer[plaintext_len] = '\n';
-  //buffer[plaintext_len+1] = '\0';
+  buffer[plaintext_len] = '\n';
+  buffer[plaintext_len+1] = '\0';
 
-  printf("%s\n", buffer);
+  printf("%s", buffer);
 
 
   // Close the socket

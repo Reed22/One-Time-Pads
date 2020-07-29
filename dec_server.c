@@ -137,11 +137,6 @@ int main(int argc, char *argv[]){
       error("ERROR on accept");
     }
 
-    //USE THIS INFO TO VEFIFY CONNECTION WITH RIGHT CLIENT
-    printf("SERVER: Connected to client running at host %d port %d\n", 
-                          ntohs(clientAddress.sin_addr.s_addr),
-                          ntohs(clientAddress.sin_port));
-
     // Get the message from the client and display it
     memset(cipher_buf, '\0', 100000);
     memset(key_buf, '\0', 100000);
@@ -172,8 +167,8 @@ int main(int argc, char *argv[]){
     //Encrypt plaintext and send
     decrypt(connectionSocket, cipher_buf, key_buf);
 
-    close(connectionSocket); 
-  }
+    close(connectionSocket);
+    } 
   // Close the listening socket
   close(listenSocket); 
   return 0;

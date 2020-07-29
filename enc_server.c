@@ -46,8 +46,7 @@ void encrypt(int conn_socket, char plain[], char key[]){
     int plain_num, key_num;
     int chars_read = 0;
     char ciphertext[plain_len];
-    printf("%s\n", plain);
-    printf("%s\n", key);
+
     //Go through each character of plain and key to get ciphertext
     for(int i = 0; i < plain_len; i++){
         //Subtract 65 from ASCII to get order (A = 0, Z = 25)
@@ -128,30 +127,13 @@ int main(int argc, char *argv[]){
     if (connectionSocket < 0){
       error("ERROR on accept");
     }
-
-    memset(plain_buf, '\0', 100000);
+    pid_t child_pid = fork();
+    pid_t parent = getpid();
+    if(child_pid){
+memset(plain_buf, '\0', 100000);
     memset(key_buf, '\0', 100000);
     memset(enc_client_req, '\0', 256);
     
-     //Receive Authorization
-    chars_read = recv(connectionSocket, enc_client_req, 255, 0); 
-    if (chars_read < 0){
-        error("ERROR reading from socket");
-    }
-
-    chars_written = 0;
-
-    //Send permission granted message
-    if(strcmp(enc_client_req, "enc_req") == 0){
-          expected_chars_sent = strlen(perm_resp);
-          while(chars_written < expected_chars_sent)
-            chars_written += send(connectionSocket, perm_resp, strlen(perm_resp), 0); 
-    }
-    else {
-          expected_chars_sent = strlen(denied);
-          while(chars_written < expected_chars_sent)
-            chars_written += send(connectionSocket, denied, strlen(denied), 0); 
-    }
 
     //Read the client's message from the socket
     for(int i = 0; i < NUM_MESSAGES; i++){
@@ -177,6 +159,7 @@ int main(int argc, char *argv[]){
     encrypt(connectionSocket, plain_buf, key_buf);
 
     close(connectionSocket); 
+    }
   }
   // Close the listening socket
   close(listenSocket); 
