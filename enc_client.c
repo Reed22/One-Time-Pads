@@ -72,7 +72,7 @@ int sendFile(int socket, char* file_name, int length){
     for(int i = 0; i < length; i++){
       c = getc(file);
       if(!isupper(c) && !isspace(c)){
-        fprintf(stderr, "Error: Bad character detected\n");
+        fprintf(stderr, "Error: Bad character detected in %s\n", file_name);
         return -1;
       }
       buf[i] = c;

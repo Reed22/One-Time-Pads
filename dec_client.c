@@ -16,7 +16,6 @@
 #define Z_ASCII 90    //90 is ascii for 'Z'
 #define SPACE_ASCII 32  //Ascii for space character
 
-bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -73,17 +72,13 @@ int sendFile(int socket, char* file_name, int length){
     for(int i = 0; i < length; i++){
       c = getc(file);
       if(!isupper(c) && !isspace(c)){
-        fprintf(stderr, "Error: Bad character detected\n");
+        fprintf(stderr, "Error: Bad character detected in %s\n", file_name);
         return -1;
       }
       buf[i] = c;
     }
     //Strip the newline character
     buf[length] = '\0';
-    
-    if(false){
-      printf("buf: %s\n", buf);
-    }
 
     fclose(file);
     int expected_chars_written = strlen(buf);
@@ -134,7 +129,7 @@ int main(int argc, char *argv[]) {
   } 
   //Check to make sure key is at least as big as plaintext
   //argv[1] = plaintext    argv[2] = key
-  int ciphertext_len = fileLength(argv[1]);
+  int plaintext_len = fileLength(argv[1]);
   int key_len = fileLength(argv[2]);
 
   if(fileLength(argv[1]) > fileLength(argv[2])){
@@ -157,9 +152,10 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR connecting");
   }
 
+  
   //Send plaintext and key
   //Returns -1 if bad character detected
-  success = sendFile(socketFD, argv[1], ciphertext_len);
+  success = sendFile(socketFD, argv[1], plaintext_len);
   if(success == -1){
     exit(1);
   }
@@ -169,11 +165,8 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  if(debug)
-    printf("CLIENT: ciphertext_len: %d\n", ciphertext_len);
-
   //Declare buff with length + 1 (+1 to account for newline)
-  char buffer[ciphertext_len + 1]; 
+  char buffer[plaintext_len + 1]; 
   memset(buffer, '\0', sizeof(buffer));
 
   //Read ciphertext
@@ -182,15 +175,12 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR reading from socket");
   }
 
-  //Insert newline character to end of buffer
-  buffer[ciphertext_len] = '\n';
-
-  if(debug){
-    printf("CLIENT: SIZE OF BUFFER: %d\n", strlen(buffer));
-    //printf("CLIENT: I received this from the server: \"%s\"\n", buffer);
-  }
+  //Insert newline character and null characterto end of buffer
+  buffer[plaintext_len] = '\n';
+  buffer[plaintext_len+1] = '\0';
 
   printf("%s", buffer);
+
 
   // Close the socket
   close(socketFD); 

@@ -8,11 +8,10 @@
 #include <stdbool.h> 
 
 #define NUM_MESSAGES 2
-#define CIPHER_MSG 0
+#define PLAIN_MSG 0
 #define KEY_MSG 1
 #define SPACE_ASCII 32
 
-bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -38,7 +37,6 @@ void setupAddressStruct(struct sockaddr_in* address,
   // Allow a client at any address to connect to this server
   address->sin_addr.s_addr = INADDR_ANY;
 }
-
 /**************************************************************
 *                 void encrypt(cipher, key)
 ***************************************************************/
@@ -83,10 +81,7 @@ void decrypt(int conn_socket, char cipher[], char key[]){
     int expected_chars_sent = strlen(plaintext);
     while(chars_read < expected_chars_sent)
       chars_read += send(conn_socket, plaintext, strlen(plaintext), 0); 
-    
-    if(debug){
-      printf("Server: Expected(%d) ::: Actual(%d)\n", expected_chars_sent, chars_read);
-    }
+
 
     if (chars_read < 0)
       error("ERROR writing to socket");
@@ -95,9 +90,12 @@ void decrypt(int conn_socket, char cipher[], char key[]){
 *              int main(int argc, char *argv[])
 ***************************************************************/
 int main(int argc, char *argv[]){
-  int connectionSocket, charsRead;
-  char cipher_buf[100000]; //This needs to be larger
+  int connectionSocket, chars_read, chars_written, expected_chars_sent;
+  char plain_buf[100000]; //This needs to be larger
   char key_buf[100000];   //This needs to be larger
+  char enc_client_req[256];
+  char perm_resp[] = "granted";
+  char denied[] = "denied";
   struct sockaddr_in serverAddress, clientAddress;
   socklen_t sizeOfClientInfo = sizeof(clientAddress);
 
@@ -139,27 +137,25 @@ int main(int argc, char *argv[]){
     pid_t child_pid = fork();
     pid_t parent = getpid();
     if(child_pid){
-    // Get the message from the client and display it
-    memset(cipher_buf, '\0', 100000);
+memset(plain_buf, '\0', 100000);
     memset(key_buf, '\0', 100000);
+    memset(enc_client_req, '\0', 256);
+    
 
+    //Read the client's message from the socket
     for(int i = 0; i < NUM_MESSAGES; i++){
-        //Read the client's message from the socket
         //First message is plaintext;
-        if(i == CIPHER_MSG){
-          charsRead = recv(connectionSocket, cipher_buf, 99999, 0); 
-          if (charsRead < 0){
+        if(i == PLAIN_MSG){
+          chars_read = recv(connectionSocket, plain_buf, 99999, 0); 
+          if (chars_read < 0){
             error("ERROR reading from socket");
           }
-          if(debug)
-            //printf("SERVER: \n\n\n\n\n%s\ncipher Length: %d\n\n\n\n\n", cipher_buf, strlen(cipher_buf));
-            printf("SERVER: cipher Length: %d\n", strlen(cipher_buf));
         }
 
         //Second message is key
         else if(i == KEY_MSG){
-          charsRead = recv(connectionSocket, key_buf, 99999, 0); 
-          if (charsRead < 0){
+          chars_read = recv(connectionSocket, key_buf, 99999, 0); 
+          if (chars_read < 0){
             error("ERROR reading from socket");
           }
           //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
@@ -167,10 +163,11 @@ int main(int argc, char *argv[]){
     }
 
     //Encrypt plaintext and send
-    decrypt(connectionSocket, cipher_buf, key_buf);
+    decrypt(connectionSocket, plain_buf, key_buf);
 
-    close(connectionSocket);
-    } 
+    close(connectionSocket); 
+    
+  }
   }
   // Close the listening socket
   close(listenSocket); 

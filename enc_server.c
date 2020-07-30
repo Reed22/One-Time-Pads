@@ -12,7 +12,6 @@
 #define KEY_MSG 1
 #define SPACE_ASCII 32
 
-bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -68,8 +67,6 @@ void encrypt(int conn_socket, char plain[], char key[]){
         if(ciphertext[i] == 26 + 65)
           ciphertext[i] = SPACE_ASCII;
         
-        //printf("( %c(%d) + %c(%d) ) MOD 27 = %d  +  65 = %c \n", plain[i], plain_num, key[i], key_num, ((plain_num + key_num) % 27), ciphertext[i]);
-
     }
 
     int expected_chars_sent = strlen(ciphertext);
