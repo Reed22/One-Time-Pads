@@ -142,7 +142,7 @@ killall -q -u $USER dec_server
 killall -q -u $USER enc_client
 killall -q -u $USER enc_server
 rm -f ciphertext*
-rm -f plaintext*_*
+#rm -f plaintext*_*
 rm -f key20
 rm -f key70000
 ${echo}

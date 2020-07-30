@@ -159,7 +159,8 @@ memset(plain_buf, '\0', 100000);
     encrypt(connectionSocket, plain_buf, key_buf);
 
     close(connectionSocket); 
-    }
+    
+  }
   }
   // Close the listening socket
   close(listenSocket); 

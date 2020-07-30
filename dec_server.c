@@ -136,7 +136,9 @@ int main(int argc, char *argv[]){
     if (connectionSocket < 0){
       error("ERROR on accept");
     }
-
+    pid_t child_pid = fork();
+    pid_t parent = getpid();
+    if(child_pid){
     // Get the message from the client and display it
     memset(cipher_buf, '\0', 100000);
     memset(key_buf, '\0', 100000);
@@ -169,6 +171,7 @@ int main(int argc, char *argv[]){
 
     close(connectionSocket);
     } 
+  }
   // Close the listening socket
   close(listenSocket); 
   return 0;
