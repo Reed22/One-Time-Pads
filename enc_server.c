@@ -46,8 +46,11 @@ void encrypt(int conn_socket, char plain[], char key[]){
     int chars_read = 0;
     char ciphertext[plain_len];
 
+    int ciph_index = 0; //ciph_index will be one character behinf plaintext and key
+
+    //Start at one to skip past the validating char
     //Go through each character of plain and key to get ciphertext
-    for(int i = 0; i < plain_len; i++){
+    for(int i = 1; i < plain_len; i++){
         //Subtract 65 from ASCII to get order (A = 0, Z = 25)
         plain_num = plain[i] - 65;
         key_num = key[i] - 65;
@@ -62,12 +65,13 @@ void encrypt(int conn_socket, char plain[], char key[]){
         
         //Mod 27 to account for space characters....need confirmation that this is okay. 
         //Add plain_num and key_num, take Modulus of 27, add 65 to get ASCII back
-        ciphertext[i] = ((plain_num + key_num) % 27) + 65;
+        ciphertext[ciph_index] = ((plain_num + key_num) % 27) + 65;
 
-        if(ciphertext[i] == 26 + 65)
-          ciphertext[i] = SPACE_ASCII;
-        
+        if(ciphertext[ciph_index] == 26 + 65)
+          ciphertext[ciph_index] = SPACE_ASCII;
+        ciph_index++;
     }
+        //printf("ciphertext: %s\n", ciphertext);
 
     int expected_chars_sent = strlen(ciphertext);
     while(chars_read < expected_chars_sent)
@@ -127,37 +131,41 @@ int main(int argc, char *argv[]){
     pid_t child_pid = fork();
     pid_t parent = getpid();
     if(child_pid){
-memset(plain_buf, '\0', 100000);
-    memset(key_buf, '\0', 100000);
-    memset(enc_client_req, '\0', 256);
-    
+      memset(plain_buf, '\0', 100000);
+      memset(key_buf, '\0', 100000);
+      memset(enc_client_req, '\0', 256);
+      
 
-    //Read the client's message from the socket
-    for(int i = 0; i < NUM_MESSAGES; i++){
-        //First message is plaintext;
-        if(i == PLAIN_MSG){
-          chars_read = recv(connectionSocket, plain_buf, 99999, 0); 
-          if (chars_read < 0){
-            error("ERROR reading from socket");
+      //Read the client's message from the socket
+      for(int i = 0; i < NUM_MESSAGES; i++){
+          //First message is plaintext;
+          if(i == PLAIN_MSG){
+            chars_read = recv(connectionSocket, plain_buf, 99999, 0); 
+            if (chars_read < 0){
+              error("ERROR reading from socket");
+            }
           }
-        }
 
-        //Second message is key
-        else if(i == KEY_MSG){
-          chars_read = recv(connectionSocket, key_buf, 99999, 0); 
-          if (chars_read < 0){
-            error("ERROR reading from socket");
+          //Second message is key
+          else if(i == KEY_MSG){
+            chars_read = recv(connectionSocket, key_buf, 99999, 0); 
+            if (chars_read < 0){
+              error("ERROR reading from socket");
+            }
+            //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
           }
-          //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
-        }
+      }
+      //If first character is not lower_case 'e', then client is not enc_client -> reject
+      if(plain_buf[0] != 'e'){
+        char reject[] = "denied";
+        chars_read += send(connectionSocket, reject, strlen(reject), 0); 
+      }
+      else{
+        //Encrypt plaintext and send
+        encrypt(connectionSocket, plain_buf, key_buf);
+      }
+      close(connectionSocket);
     }
-
-    //Encrypt plaintext and send
-    encrypt(connectionSocket, plain_buf, key_buf);
-
-    close(connectionSocket); 
-    
-  }
   }
   // Close the listening socket
   close(listenSocket); 

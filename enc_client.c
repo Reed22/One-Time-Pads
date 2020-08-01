@@ -69,7 +69,9 @@ int sendFile(int socket, char* file_name, int length){
 
     fseek (file, 0, SEEK_SET);
 
-    for(int i = 0; i < length; i++){
+    buf[0] = 'e'; //VALIDATION
+
+    for(int i = 1; i <= length; i++){
       c = getc(file);
       if(!isupper(c) && !isspace(c)){
         fprintf(stderr, "Error: Bad character detected in %s\n", file_name);
@@ -78,7 +80,7 @@ int sendFile(int socket, char* file_name, int length){
       buf[i] = c;
     }
     //Strip the newline character
-    buf[length] = '\0';
+    buf[length+1] = '\0';
 
     fclose(file);
     int expected_chars_written = strlen(buf);
@@ -175,11 +177,17 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR reading from socket");
   }
 
-  //Insert newline character and null characterto end of buffer
-  buffer[plaintext_len] = '\n';
-  buffer[plaintext_len+1] = '\0';
+  if(strcmp(buffer,"denied") == 0){
+    printf("Permission Denied: enc_client cannont connect on port %c\n", argv[3]);
+    close(socketFD); 
+  }
+  else{
+    //Insert newline character and null characterto end of buffer
+    buffer[plaintext_len] = '\n';
+    buffer[plaintext_len+1] = '\0';
 
-  printf("%s", buffer);
+    printf("%s", buffer);
+  }
 
 
   // Close the socket
