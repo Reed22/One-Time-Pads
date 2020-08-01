@@ -140,7 +140,7 @@ int main(int argc, char *argv[]){
     }
     pid_t child_pid = fork();
     pid_t parent = getpid();
-    if(child_pid){
+    if(child_pid == 0){
       memset(plain_buf, '\0', 100000);
       memset(key_buf, '\0', 100000);
       memset(enc_client_req, '\0', 256);

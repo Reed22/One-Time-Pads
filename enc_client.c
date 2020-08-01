@@ -136,6 +136,7 @@ int main(int argc, char *argv[]) {
 
   if(fileLength(argv[1]) > fileLength(argv[2])){
     fprintf(stderr,"Error: Key is shorter than plaintext\n");
+    printf("Error: %s is shorter than %s\n", argv[2], argv[1]);
     exit(1);
   }
 
