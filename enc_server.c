@@ -5,7 +5,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <sys/wait.h>
 #include <stdbool.h> 
+#include <signal.h>
 
 #define NUM_MESSAGES 2
 #define PLAIN_MSG 0
@@ -38,15 +40,16 @@ void setupAddressStruct(struct sockaddr_in* address,
   address->sin_addr.s_addr = INADDR_ANY;
 }
 /**************************************************************
-*                 void encrypt(plain, key)
+*   void encrypt(int conn_socket, char plain[], char key[])
+*
+* Encrypts plaintext and sends to client
 ***************************************************************/
 void encrypt(int conn_socket, char plain[], char key[]){
-    int plain_len = strlen(plain);
-    int plain_num, key_num;
-    int chars_read = 0;
-    char ciphertext[plain_len];
-
-    int ciph_index = 0; //ciph_index will be one character behinf plaintext and key
+    int plain_len = strlen(plain);  //Holds length of plaintext
+    int plain_num, key_num;         //Holds integer code for plaintext and key chars 
+    int chars_read = 0;             //Used to make sure recv works
+    char ciphertext[plain_len];     //Holds chiphertext string
+    int ciph_index = 0;             //Holds next available index for ciphertext
 
     //Start at one to skip past the validating char
     //Go through each character of plain and key to get ciphertext
@@ -63,16 +66,18 @@ void encrypt(int conn_socket, char plain[], char key[]){
         if(key[i] == SPACE_ASCII)
           key_num = 26;
         
-        //Mod 27 to account for space characters....need confirmation that this is okay. 
+        //Mod 27 to account for space characters
         //Add plain_num and key_num, take Modulus of 27, add 65 to get ASCII back
         ciphertext[ciph_index] = ((plain_num + key_num) % 27) + 65;
 
+        //Account for space characters 
         if(ciphertext[ciph_index] == 26 + 65)
           ciphertext[ciph_index] = SPACE_ASCII;
+        
         ciph_index++;
     }
-        //printf("ciphertext: %s\n", ciphertext);
 
+    //Send ciphertext to client
     int expected_chars_sent = strlen(ciphertext);
     while(chars_read < expected_chars_sent)
       chars_read += send(conn_socket, ciphertext, strlen(ciphertext), 0); 
@@ -84,12 +89,13 @@ void encrypt(int conn_socket, char plain[], char key[]){
 *              int main(int argc, char *argv[])
 ***************************************************************/
 int main(int argc, char *argv[]){
-  int connectionSocket, chars_read, chars_written, expected_chars_sent;
-  char plain_buf[100000]; //This needs to be larger
-  char key_buf[100000];   //This needs to be larger
-  char enc_client_req[256];
-  char perm_resp[] = "granted";
-  char denied[] = "denied";
+  int connectionSocket, chars_read, chars_written, expected_chars_sent, status;  //Variables used for socket
+  char plain_buf[100000];            //Holds plaintext sent from client (big enough for max file)
+  char key_buf[100000];              //Holds key sent from client (big enough for max file)
+  pid_t process_array[256];          //Holds child processes that are forked         
+  int num_processes = 0;             //Holds number of alive child processes, also used as index for for process_array
+  
+  //Variables used for socket
   struct sockaddr_in serverAddress, clientAddress;
   socklen_t sizeOfClientInfo = sizeof(clientAddress);
 
@@ -128,14 +134,13 @@ int main(int argc, char *argv[]){
     if (connectionSocket < 0){
       error("ERROR on accept");
     }
+
+    //Fork off a child to handle encryption
     pid_t child_pid = fork();
-    pid_t parent = getpid();
     if(child_pid == 0){
       memset(plain_buf, '\0', 100000);
       memset(key_buf, '\0', 100000);
-      memset(enc_client_req, '\0', 256);
       
-
       //Read the client's message from the socket
       for(int i = 0; i < NUM_MESSAGES; i++){
           //First message is plaintext;
@@ -152,19 +157,41 @@ int main(int argc, char *argv[]){
             if (chars_read < 0){
               error("ERROR reading from socket");
             }
-            //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
           }
       }
-      //If first character is not lower_case 'e', then client is not enc_client -> reject
+      //If first character is not lower_case 'e', then client is not enc_client
+      //Send rejection message if so
       if(plain_buf[0] != 'e'){
         char reject[] = "denied";
         chars_read += send(connectionSocket, reject, strlen(reject), 0); 
       }
       else{
-        //Encrypt plaintext and send
+        //Encrypt plaintext and send to client
         encrypt(connectionSocket, plain_buf, key_buf);
       }
       close(connectionSocket);
+      exit(EXIT_SUCCESS);
+    }
+
+    //If parent, add child to process array and monitor other child processes
+    else{
+      process_array[num_processes] = child_pid;
+      num_processes++;
+
+      //Check for completed child processes.
+      for(int i = 0; i < num_processes; i++){
+          pid_t this_pid = waitpid(process_array[i], &status, WNOHANG);
+          //If waitpid returns pid, kill that processes
+          if(this_pid > 0){
+              kill(this_pid, SIGTERM);                
+              
+              //Need to "delete" killed pid and decrement number of process
+              for(int j = i; i < num_processes - 1; i++){
+                  process_array[j] = process_array[j + 1];
+              }
+              num_processes--;
+          }
+      }
     }
   }
   // Close the listening socket
