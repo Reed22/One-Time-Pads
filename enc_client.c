@@ -56,10 +56,13 @@ void setupAddressStruct(struct sockaddr_in* address,
 }
 
 /**************************************************************
-*                 char* sendFile(char* file_name)
+*   int sendFile(int socket, char* file_name, int length)
+*
+* Reads file_name's contents and sends to server socket
+*
+* Return -1 if unsuccessful, 1 if successful
 ***************************************************************/
 int sendFile(int socket, char* file_name, int length){
-	  //char file_path[256];
     char c;             //holds char of file before inserting into buf
     FILE* file;         //file pointer used to open file_name
     char buf[length];   //holds full text from file
@@ -69,25 +72,30 @@ int sendFile(int socket, char* file_name, int length){
 
     fseek (file, 0, SEEK_SET);
 
-    for(int i = 0; i < length; i++){
+    //Validation char, sent to server so server can check that correct
+    //program is connecting
+    buf[0] = 'e';
+
+    //Go through each char in file
+    for(int i = 1; i <= length; i++){
       c = getc(file);
+      //If char is not uppercase letter or space, it is a bad character
       if(!isupper(c) && !isspace(c)){
-        fprintf(stderr, "Error: Bad character detected\n");
+        fprintf(stderr, "Error: Bad character detected in %s\n", file_name);
         return -1;
       }
+      //Otherwise, insert into buffer
       buf[i] = c;
     }
     //Strip the newline character
-    buf[length] = '\0';
+    buf[length+1] = '\0';
 
     fclose(file);
+
+    //Send file to server socket
     int expected_chars_written = strlen(buf);
     while(chars_written < expected_chars_written)
       chars_written += send(socket, buf, strlen(buf), 0); 
-
-    //IT SAYS IT IS SENDING THE RIGHT AMOUNT OF DATA
-    printf("CLIENT: Expected(%d) :: Actual(%d)\n",expected_chars_written,chars_written);
-    printf("CLIENT: Strlen of buf: %d\n", strlen(buf));
 
     if (chars_written < 0){
       error("CLIENT: ERROR writing to socket");
@@ -102,9 +110,11 @@ int sendFile(int socket, char* file_name, int length){
 
 /**************************************************************
 *                 int fileLength(char* file_name)
+*
+* Reads file and returns number of characters in file.
 ***************************************************************/
 int fileLength(char* file_name){
-    int length; 
+    int length;
     FILE* file;
 
     file = fopen(file_name, "r");
@@ -121,22 +131,23 @@ int fileLength(char* file_name){
 *                 int main(int argc, char *argv[])
 ***************************************************************/
 int main(int argc, char *argv[]) {
-  int socketFD, portNumber, charsWritten, charsRead, success;
-  struct sockaddr_in serverAddress;
-  char* host_name = "localhost";
-  
+  int socketFD, portNumber, charsWritten, charsRead, success; //Variables used for socket
+  struct sockaddr_in serverAddress;                           //Variables used for socket
+  char* host_name = "localhost";                              //Address that socket will connect to
+  int plaintext_len = fileLength(argv[1]);                    //Length of plaintext
+  int key_len = fileLength(argv[2]);                          //Length of key
+  char buffer[plaintext_len + 1];                             //Buffer that will hold message received from server
+
   // Check usage & args
   if (argc < 4) { 
     fprintf(stderr,"USAGE: %s plaintext key port\n", argv[0]); 
     exit(0); 
   } 
-  //Check to make sure key is at least as big as plaintext
-  //argv[1] = plaintext    argv[2] = key
-  int plaintext_len = fileLength(argv[1]);
-  int key_len = fileLength(argv[2]);
 
+  //If key is shorter than plaintext, there is an error
   if(fileLength(argv[1]) > fileLength(argv[2])){
     fprintf(stderr,"Error: Key is shorter than plaintext\n");
+    printf("Error: %s is shorter than %s\n", argv[2], argv[1]);
     exit(1);
   }
 
@@ -155,26 +166,7 @@ int main(int argc, char *argv[]) {
     error("CLIENT: ERROR connecting");
   }
 
-  //Send Authorization
-  char enc_req[] = "enc_req";
-  char enc_res[256];
-  int expected_chars_written = strlen(enc_req);
-  int chars_written = 0;
-
-  //Send Authorization
-  while(chars_written < expected_chars_written)
-      chars_written += send(socketFD, enc_req, strlen(enc_req), 0);
-
-  //Receive Authorization response
-  charsRead = recv(socketFD, enc_res, sizeof(enc_res) - 1, 0);
-  if (charsRead < 0){
-    error("CLIENT: ERROR reading from socket");
-  }
-  if(strcmp(enc_res, "granted") != 0){
-    fprintf(stderr,"Error: Permission Denied\n");
-    exit(2);
-  }
-
+  
   //Send plaintext and key
   //Returns -1 if bad character detected
   success = sendFile(socketFD, argv[1], plaintext_len);
@@ -187,23 +179,25 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  //Declare buff with length + 1 (+1 to account for newline)
-  char buffer[plaintext_len + 1]; 
   memset(buffer, '\0', sizeof(buffer));
 
   //Read ciphertext
-  //BUFFER IS NOT RECEIVING ALL OF THE INFO
   charsRead = recv(socketFD, buffer, sizeof(buffer) - 1, 0);
   if (charsRead < 0){
     error("CLIENT: ERROR reading from socket");
   }
-  printf("CLIENT: Plaintext_Len : %d\n", plaintext_len);
-  printf("CLIENT: Final strlen : %d\n\n", strlen(buffer));
-  //Insert newline character and null characterto end of buffer
-  //buffer[plaintext_len] = '\n';
-  //buffer[plaintext_len+1] = '\0';
 
-  //printf("%s\n", buffer);
+  //If message says denied, then it connected to wrong server socket
+  if(strcmp(buffer,"denied") == 0){
+    printf("Permission Denied: enc_client cannot connect on port %d\n", argv[3]);
+    close(socketFD); 
+  }
+  else{
+    //Insert newline character and null characterto end of buffer
+    buffer[plaintext_len] = '\n';
+    buffer[plaintext_len+1] = '\0';
+    printf("%s", buffer);
+  }
 
 
   // Close the socket

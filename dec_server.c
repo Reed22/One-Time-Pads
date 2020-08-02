@@ -3,17 +3,17 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
-#include <sys/wait.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdbool.h> 
+#include <sys/wait.h>
+#include <signal.h>
 
 #define NUM_MESSAGES 2
 #define CIPHER_MSG 0
 #define KEY_MSG 1
 #define SPACE_ASCII 32
 
-bool debug = false;
 /**************************************************************
 *                 void error(const char *msg)
 ***************************************************************/
@@ -39,18 +39,22 @@ void setupAddressStruct(struct sockaddr_in* address,
   // Allow a client at any address to connect to this server
   address->sin_addr.s_addr = INADDR_ANY;
 }
+
 /**************************************************************
-*                 void decrypt(socket, cipher, key)
+*    void decrypt(int conn_socket, char cipher[],char key[])
+*
+* Decrypts cipher message and sends back to client
 ***************************************************************/
 void decrypt(int conn_socket, char cipher[], char key[]){
-    int cipher_len = strlen(cipher);
-    int cipher_num, key_num;
-    int chars_read = 0;
-    char plaintext[cipher_len];
-    int diff;
+    int cipher_len = strlen(cipher); //Holds length of ciphertext
+    int cipher_num, key_num;  //Used to hold integer code for each char in cipher and key
+    int chars_read = 0; //Used to determine if recv worked
+    char plaintext[cipher_len]; //Used to hold final plaintext after decryption
+    int diff; //Holds differnce of cipher_num and key_num
+    int plain_index = 0; //Holds next index of plaintext[]
 
     //Go through each character of cipher and key to get plaintext
-    for(int i = 0; i < cipher_len; i++){
+    for(int i = 1; i < cipher_len; i++){
         //Subtract 65 from ASCII to get order (A = 0, Z = 25)
         cipher_num = cipher[i] - 65;
         key_num = key[i] - 65;
@@ -67,26 +71,26 @@ void decrypt(int conn_socket, char cipher[], char key[]){
         //Mod 27 to account for space characters
         //Subtract cipher_num and key_num, take Modulus of 27, add 65 to get ASCII back
         diff = cipher_num - key_num;
+        //If the difference is negative, add 27
         if(diff < 0){
           diff += 27;
         }
 
-        plaintext[i] = (diff % 27) + 65;
+        //Insert character into plaintext[]
+        plaintext[plain_index] = (diff % 27) + 65;
 
-        if(plaintext[i] == 65 + 26)
-          plaintext[i] = SPACE_ASCII;
-
-        //printf("( %c(%d) - %c(%d) ) MOD 27 = %d  +  65 = %c \n", cipher[i], cipher_num, key[i], key_num, ((diff) % 27), plaintext[i]);
-
+        //Accounts for space characrers
+        if(plaintext[plain_index] == 65 + 26)
+          plaintext[plain_index] = SPACE_ASCII;
+        
+        plain_index++;
     }
 
+    //Send plaintext to client socket
     int expected_chars_sent = strlen(plaintext);
     while(chars_read < expected_chars_sent)
       chars_read += send(conn_socket, plaintext, strlen(plaintext), 0); 
-    
-    if(debug){
-      printf("Server: Expected(%d) ::: Actual(%d)\n", expected_chars_sent, chars_read);
-    }
+
 
     if (chars_read < 0)
       error("ERROR writing to socket");
@@ -95,12 +99,12 @@ void decrypt(int conn_socket, char cipher[], char key[]){
 *              int main(int argc, char *argv[])
 ***************************************************************/
 int main(int argc, char *argv[]){
-  int connectionSocket, chars_read, chars_written, expected_chars_sent;
+  int connectionSocket, chars_read, chars_written, expected_chars_sent, status; //Variables for socket
   char cipher_buf[100000]; //This needs to be larger
   char key_buf[100000];   //This needs to be larger
-  char dec_client_req[256];
-  char perm_resp[] = "granted";
-  char denied[] = "denied";
+  pid_t process_array[256]; //Holds child processes
+  int num_processes = 0;  //holds number of child processes; also used as index for process_array
+  //Variables for socket
   struct sockaddr_in serverAddress, clientAddress;
   socklen_t sizeOfClientInfo = sizeof(clientAddress);
 
@@ -139,61 +143,66 @@ int main(int argc, char *argv[]){
     if (connectionSocket < 0){
       error("ERROR on accept");
     }
+
+    //Fork a process and let child process do decryption
     pid_t child_pid = fork();
-    int child_status;
     if(child_pid == 0){
-        memset(cipher_buf, '\0', 100000);
-        memset(key_buf, '\0', 100000);
-        memset(dec_client_req, '\0', 256);
-        
-        //Receive Authorization
-        chars_read = recv(connectionSocket, dec_client_req, 255, 0); 
-        if (chars_read < 0){
-            error("ERROR reading from socket");
-        }
-
-        chars_written = 0;
-
-        //Send permission granted message
-        if(strcmp(dec_client_req, "dec_req") == 0){
-            expected_chars_sent = strlen(perm_resp);
-            while(chars_written < expected_chars_sent)
-                chars_written += send(connectionSocket, perm_resp, strlen(perm_resp), 0); 
-        }
-        else {
-            expected_chars_sent = strlen(denied);
-            while(chars_written < expected_chars_sent)
-                chars_written += send(connectionSocket, denied, strlen(denied), 0); 
-        }
-
-        //Read the client's message from the socket
-        for(int i = 0; i < NUM_MESSAGES; i++){
-            //First message is plaintext;
-            if(i == CIPHER_MSG){
+      //Clear out all buffers
+      memset(cipher_buf, '\0', 100000);
+      memset(key_buf, '\0', 100000);
+      
+      //Read the client's message from the socket
+      for(int i = 0; i < NUM_MESSAGES; i++){
+          //First message is ciphertext;
+          if(i == CIPHER_MSG){
             chars_read = recv(connectionSocket, cipher_buf, 99999, 0); 
             if (chars_read < 0){
-                error("ERROR reading from socket");
+              error("ERROR reading from socket");
             }
-            }
+          }
 
-            //Second message is key
-            else if(i == KEY_MSG){
+          //Second message is key
+          else if(i == KEY_MSG){
             chars_read = recv(connectionSocket, key_buf, 99999, 0); 
             if (chars_read < 0){
-                error("ERROR reading from socket");
+              error("ERROR reading from socket");
             }
-            //printf("SERVER: I received this from the client: \"%s\"\n", key_buf);
-            }
-        }
-
-        //Decrypt ciphertext and send
-        decrypt(connectionSocket, cipher_buf, key_buf);
-
-        close(connectionSocket); 
+          }
+      }
+      //If first character is not lower_case 'd', then client is not dec_client
+      //Send rejection message if so
+      if(cipher_buf[0] != 'd'){
+        char reject[] = "denied";
+        chars_read += send(connectionSocket, reject, strlen(reject), 0); 
+      }
+      else{
+          //Encrypt ciphertext and send to client socket
+          decrypt(connectionSocket, cipher_buf, key_buf);
+      }
+      close(connectionSocket);
+      exit(EXIT_SUCCESS);  
     }
-    else
-      child_pid = waitpid(child_pid, &child_status, WNOHANG);
+    //If parent, add child process to array and kill any
+    //processes that are done.
+    else{
+      process_array[num_processes] = child_pid;
+      num_processes++;
 
+      //Check for completed child processes.
+      for(int i = 0; i < num_processes; i++){
+          pid_t this_pid = waitpid(process_array[i], &status, WNOHANG);
+          //If waitpid returns pid, kill that processes
+          if(this_pid > 0){
+              kill(this_pid, SIGTERM);                
+
+              //Need to "delete" killed pid and decrement number of process
+              for(int j = i; i < num_processes - 1; i++){
+                  process_array[j] = process_array[j + 1];
+              }
+              num_processes--;
+          }
+      }
+    }
   }
   // Close the listening socket
   close(listenSocket); 
